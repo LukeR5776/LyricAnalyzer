@@ -1,0 +1,35 @@
+{
+  "name": "lyric-analyzer",
+  "version": "1.0.0",
+  "description": "A desktop application that integrates Spotify and Genius.com to display song lyrics with annotations",
+  "main": "frontend/public/electron.js",
+  "scripts": {
+    "electron-dev": "cd frontend && npm run electron-dev",
+    "electron": "cd frontend && npm start",
+    "frontend": "cd frontend && npm start",
+    "backend": "cd backend && source venv/bin/activate && python main.py",
+    "install-frontend": "cd frontend && npm install",
+    "install-backend": "cd backend && pip install -r requirements.txt",
+    "install-all": "npm run install-backend && npm run install-frontend",
+    "dev": "concurrently \"npm run backend\" \"npm run electron-dev\"",
+    "setup": "echo 'Please run: npm run install-all' && echo 'Then configure .env in backend/ directory' && echo 'Finally run: npm run dev'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LukeR5776/LyricAnalyzer.git"
+  },
+  "keywords": [
+    "spotify",
+    "genius",
+    "lyrics",
+    "annotations",
+    "electron",
+    "desktop",
+    "music"
+  ],
+  "author": "LukeR5776",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
