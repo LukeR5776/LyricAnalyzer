@@ -25,14 +25,35 @@ const LyricsViewer = ({ lyricsData }) => {
     }
   };
 
-  // Note: We're not displaying full lyrics to respect copyright
-  const formatLyricsPreview = (lyrics) => {
-    if (!lyrics || lyrics === "Lyrics not available") {
-      return "Lyrics not available for this track.";
+  // Format and display lyrics with better handling
+  const formatLyricsDisplay = (lyrics) => {
+    // Handle null, undefined, or explicit "not available" messages
+    if (!lyrics ||
+        lyrics === "Lyrics not available" ||
+        lyrics.toLowerCase().includes("visit genius.com") ||
+        lyrics.toLowerCase().includes("go to genius.com")) {
+      return {
+        content: "Lyrics not currently available",
+        isUnavailable: true,
+        message: "We're having trouble retrieving the full lyrics right now. The annotations below may still provide valuable insights into this song's meaning."
+      };
     }
 
-    // Show just a preview or indication that lyrics are available
-    return "Lyrics are available on Genius.com. Click 'View on Genius' to see the full lyrics.";
+    // Check if we have substantial lyrics content
+    if (lyrics.length > 100) {
+      return {
+        content: lyrics,
+        isUnavailable: false,
+        message: null
+      };
+    }
+
+    // Handle short/placeholder content
+    return {
+      content: "Lyrics preview not available",
+      isUnavailable: true,
+      message: "The full lyrics are available on Genius.com. Click 'View on Genius' above to see them, or explore the annotations below for insights into this song."
+    };
   };
 
   return (
@@ -97,17 +118,54 @@ const LyricsViewer = ({ lyricsData }) => {
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
         {activeTab === 0 && (
           <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-line', lineHeight: 1.8 }}>
-              {formatLyricsPreview(lyricsData.lyrics)}
-            </Typography>
+            {(() => {
+              const lyricsInfo = formatLyricsDisplay(lyricsData.lyrics);
+              return (
+                <>
+                  <Typography
+                    variant="body1"
+                    sx={{
+                      whiteSpace: 'pre-line',
+                      lineHeight: 1.8,
+                      color: lyricsInfo.isUnavailable ? 'text.secondary' : 'text.primary',
+                      fontStyle: lyricsInfo.isUnavailable ? 'italic' : 'normal'
+                    }}
+                  >
+                    {lyricsInfo.content}
+                  </Typography>
 
-            {lyricsData.lyrics && lyricsData.lyrics !== "Lyrics not available" && (
-              <Box mt={3} p={2} bgcolor="background.paper" borderRadius={1}>
-                <Typography variant="caption" color="text.secondary">
-                  Note: Full lyrics are available on Genius.com. This preview respects copyright restrictions.
-                </Typography>
-              </Box>
-            )}
+                  {lyricsInfo.message && (
+                    <Box mt={3} p={2} bgcolor="grey.50" borderRadius={1} border={1} borderColor="grey.200">
+                      <Typography variant="body2" color="text.secondary">
+                        <Info sx={{ fontSize: 16, mr: 1, verticalAlign: 'middle' }} />
+                        {lyricsInfo.message}
+                      </Typography>
+                      {lyricsData.genius_match?.url && (
+                        <Box mt={1}>
+                          <Link
+                            component="button"
+                            variant="body2"
+                            onClick={openGeniusPage}
+                            sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}
+                          >
+                            <OpenInNew fontSize="small" />
+                            Open full lyrics on Genius.com
+                          </Link>
+                        </Box>
+                      )}
+                    </Box>
+                  )}
+
+                  {!lyricsInfo.isUnavailable && (
+                    <Box mt={3} p={2} bgcolor="background.paper" borderRadius={1}>
+                      <Typography variant="caption" color="text.secondary">
+                        💡 Full song analysis and annotations are available in the Annotations tab above.
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              );
+            })()}
           </Box>
         )}
 

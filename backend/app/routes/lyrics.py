@@ -225,6 +225,58 @@ def sync_current_track():
             'error': str(e)
         }), 500
 
+@lyrics_bp.route('/debug-lyrics')
+def debug_lyrics():
+    """Debug endpoint to test lyrics retrieval specifically"""
+    try:
+        artist = request.args.get('artist')
+        title = request.args.get('title')
+
+        if not artist or not title:
+            return jsonify({
+                'success': False,
+                'error': 'Both artist and title parameters required'
+            }), 400
+
+        genius_client = get_genius_client()
+        if not genius_client:
+            return jsonify({
+                'success': False,
+                'error': 'Genius client not configured'
+            }), 500
+
+        # Set debug logging temporarily
+        genius_logger = logging.getLogger('app.services.genius_client')
+        original_level = genius_logger.level
+        genius_logger.setLevel(logging.DEBUG)
+
+        try:
+            # Test lyrics retrieval directly
+            lyrics_result = genius_client.get_lyrics_with_lyricsgenius(artist, title)
+
+            return jsonify({
+                'success': True,
+                'input': {
+                    'artist': artist,
+                    'title': title
+                },
+                'lyrics_result': lyrics_result,
+                'lyrics_length': len(lyrics_result) if lyrics_result else 0,
+                'has_lyrics': bool(lyrics_result),
+                'debug_info': f"Lyrics retrieval {'successful' if lyrics_result else 'failed'}"
+            })
+
+        finally:
+            # Restore original logging level
+            genius_logger.setLevel(original_level)
+
+    except Exception as e:
+        logger.error(f"Error in debug_lyrics: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @lyrics_bp.route('/debug')
 def debug_matching():
     """Debug endpoint to test song matching with detailed logs"""

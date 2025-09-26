@@ -18,8 +18,32 @@ class RateLimitedGeniusClient:
             remove_section_headers=True,
             skip_non_songs=True,
             excluded_terms=["(Remix)", "(Live)"],
-            timeout=15
+            timeout=30,  # Increased timeout
+            retries=3,   # Add retries
+            sleep_time=0.5  # Add delay between requests
         )
+
+        # Try to improve request headers to avoid being blocked
+        try:
+            if hasattr(self.genius, '_session'):
+                self.genius._session.headers.update({
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'keep-alive',
+                })
+            elif hasattr(self.genius, 'session'):
+                self.genius.session.headers.update({
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'Connection': 'keep-alive',
+                })
+        except Exception as e:
+            logger.warning(f"Could not set custom headers: {e}")
+            # Continue without custom headers
 
         # Rate limiting - Genius allows 1000 requests per day
         self.requests_per_minute = 10
@@ -218,11 +242,55 @@ class RateLimitedGeniusClient:
 
             logger.info(f"Searching lyrics for: {clean_artist} - {clean_title}")
 
-            song = self.genius.search_song(clean_title, clean_artist)
+            # Try to get the song with multiple approaches
+            song = None
+
+            # First attempt: search by title and artist
+            try:
+                song = self.genius.search_song(clean_title, clean_artist)
+                logger.debug(f"First search attempt result: {song.title if song else 'No song found'}")
+            except Exception as search_error:
+                logger.warning(f"First search attempt failed: {str(search_error)}")
+
+            # Second attempt: search by title only if first failed
+            if not song:
+                try:
+                    logger.debug("Trying search by title only")
+                    song = self.genius.search_song(clean_title)
+                    logger.debug(f"Title-only search result: {song.title if song else 'No song found'}")
+                except Exception as search_error:
+                    logger.warning(f"Title-only search failed: {str(search_error)}")
 
             if song and song.lyrics:
-                return song.lyrics
+                # Check if we got actual lyrics or a placeholder
+                lyrics_content = song.lyrics.strip()
+                logger.debug(f"Retrieved lyrics length: {len(lyrics_content)} characters")
+                logger.debug(f"Lyrics preview: {lyrics_content[:200]}...")
 
+                # Check for common placeholder patterns
+                placeholder_patterns = [
+                    "visit genius.com",
+                    "go to genius.com",
+                    "view lyrics on genius",
+                    "lyrics not available",
+                    "instrumental"
+                ]
+
+                lyrics_lower = lyrics_content.lower()
+                is_placeholder = any(pattern in lyrics_lower for pattern in placeholder_patterns)
+
+                if is_placeholder:
+                    logger.warning(f"Detected placeholder lyrics: {lyrics_content[:100]}")
+                    return None
+
+                if len(lyrics_content) > 50:  # Reasonable minimum for actual lyrics
+                    logger.info(f"Successfully retrieved lyrics ({len(lyrics_content)} chars)")
+                    return lyrics_content
+                else:
+                    logger.warning(f"Lyrics too short, likely placeholder: {lyrics_content}")
+                    return None
+
+            logger.warning(f"No lyrics found for: {clean_artist} - {clean_title}")
             return None
 
         except Exception as e:
