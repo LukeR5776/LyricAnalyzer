@@ -22,14 +22,17 @@ const MainDashboard = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [rateLimited, setRateLimited] = useState(false);
+  const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds default
+  const [fetchingTrack, setFetchingTrack] = useState(false);
 
-  // Auto-refresh current track every 10 seconds
+  // Auto-refresh current track with smart interval
   useEffect(() => {
-    if (autoRefresh) {
-      const interval = setInterval(fetchCurrentTrack, 10000);
+    if (autoRefresh && !rateLimited) {
+      const interval = setInterval(fetchCurrentTrack, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [autoRefresh]);
+  }, [autoRefresh, rateLimited, refreshInterval]);
 
   // Initial load
   useEffect(() => {
@@ -37,12 +40,17 @@ const MainDashboard = () => {
   }, []);
 
   const fetchCurrentTrack = async () => {
+    // Prevent duplicate simultaneous requests
+    if (fetchingTrack) return;
+
     try {
+      setFetchingTrack(true);
       setError(null);
       const response = await apiService.getCurrentTrack();
 
       if (response.success && response.playing) {
         setCurrentTrack(response.track);
+        setRateLimited(false); // Reset rate limit flag on success
 
         // If track changed, fetch new lyrics
         if (!lyricsData || lyricsData.spotify_track?.id !== response.track.id) {
@@ -54,9 +62,22 @@ const MainDashboard = () => {
       }
     } catch (err) {
       console.error('Error fetching current track:', err);
-      if (!currentTrack) { // Only show error if no track is currently loaded
+
+      // Handle rate limiting specifically
+      if (err.response?.status === 429 || err.response?.data?.rate_limited) {
+        setRateLimited(true);
+        setError('Rate limited by Spotify API. Auto-refresh paused for a few minutes.');
+
+        // Reset rate limit flag after 5 minutes
+        setTimeout(() => {
+          setRateLimited(false);
+          setError(null);
+        }, 300000); // 5 minutes
+      } else if (!currentTrack) { // Only show error if no track is currently loaded
         setError('Failed to get current track. Make sure Spotify is playing music.');
       }
+    } finally {
+      setFetchingTrack(false);
     }
   };
 
@@ -98,7 +119,7 @@ const MainDashboard = () => {
             Dashboard
           </Typography>
           {user && (
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" color="white">
               Welcome back, {user.display_name || user.id}
             </Typography>
           )}

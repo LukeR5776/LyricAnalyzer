@@ -34,10 +34,16 @@ const CurrentTrackCard = ({ track, onRefresh, autoRefresh, onAutoRefreshChange }
         <Box display="flex" alignItems="center" gap={2}>
           <Avatar
             variant="rounded"
-            sx={{ width: 60, height: 60 }}
+            sx={{
+              width: 80,
+              height: 80,
+              borderRadius: 2,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              border: '2px solid rgba(255,255,255,0.1)'
+            }}
             src={track.album?.images?.[0]?.url}
           >
-            <Album />
+            <Album sx={{ fontSize: 40, color: 'grey.400' }} />
           </Avatar>
 
           <Box flex={1} minWidth={0}>
@@ -48,7 +54,7 @@ const CurrentTrackCard = ({ track, onRefresh, autoRefresh, onAutoRefreshChange }
               {track.artists.join(', ')}
             </Typography>
             <Typography variant="caption" color="text.secondary" noWrap>
-              {track.album}
+              {track.album?.name || track.album}
             </Typography>
           </Box>
         </Box>
@@ -111,7 +117,7 @@ const CurrentTrackCard = ({ track, onRefresh, autoRefresh, onAutoRefreshChange }
           }
           label={
             <Typography variant="caption">
-              Auto-refresh every 10s
+              Auto-refresh every 30s
             </Typography>
           }
         />

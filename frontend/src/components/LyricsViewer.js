@@ -9,8 +9,9 @@ import {
   Chip,
   Link
 } from '@mui/material';
-import { OpenInNew, MusicNote, Info } from '@mui/icons-material';
+import { OpenInNew, MusicNote, Info, Album } from '@mui/icons-material';
 import AnnotationViewer from './AnnotationViewer';
+import AboutViewer from './AboutViewer';
 
 const LyricsViewer = ({ lyricsData }) => {
   const [activeTab, setActiveTab] = useState(0);
@@ -111,6 +112,7 @@ const LyricsViewer = ({ lyricsData }) => {
             icon={<Info />}
             iconPosition="start"
           />
+          <Tab label="About" icon={<Album />} iconPosition="start" />
         </Tabs>
       </Box>
 
@@ -171,6 +173,13 @@ const LyricsViewer = ({ lyricsData }) => {
 
         {activeTab === 1 && (
           <AnnotationViewer annotations={lyricsData.annotations || []} />
+        )}
+
+        {activeTab === 2 && (
+          <AboutViewer
+            songDetails={lyricsData.song_details}
+            geniusMatch={lyricsData.genius_match}
+          />
         )}
       </Box>
     </Paper>
