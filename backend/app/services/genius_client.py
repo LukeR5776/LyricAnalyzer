@@ -168,7 +168,7 @@ class RateLimitedGeniusClient:
                 "lyrics_state": song.get("lyrics_state"),
                 "song_art_image_url": song.get("song_art_image_url"),
                 "release_date_for_display": song.get("release_date_for_display"),
-                "description": song.get("description", {}).get("plain"),
+                "description": self._extract_description(song.get("description", {})),
                 "stats": song.get("stats", {}),
                 "album": song.get("album"),
                 "featured_artists": song.get("featured_artists", []),
@@ -475,6 +475,39 @@ class RateLimitedGeniusClient:
         partial_bonus = min(0.2, partial_matches * 0.1)
 
         return min(1.0, jaccard_score + partial_bonus)
+
+    def _extract_description(self, description_obj: Dict[str, Any]) -> Optional[str]:
+        """Extract description with format priority: html > plain > dom"""
+        if not description_obj:
+            logger.debug("No description object available")
+            return None
+
+        # Log available formats for debugging
+        available_formats = list(description_obj.keys())
+        logger.debug(f"Available description formats: {available_formats}")
+
+        # Try HTML format first (richest content)
+        if 'html' in description_obj and description_obj['html']:
+            html_content = description_obj['html'].strip()
+            logger.debug(f"Using HTML description (length: {len(html_content)})")
+            logger.debug(f"HTML description preview: {html_content[:200]}...")
+            return html_content
+
+        # Fall back to plain text
+        if 'plain' in description_obj and description_obj['plain']:
+            plain_content = description_obj['plain'].strip()
+            logger.debug(f"Using plain description (length: {len(plain_content)})")
+            logger.debug(f"Plain description preview: {plain_content[:200]}...")
+            return plain_content
+
+        # Last resort: DOM format
+        if 'dom' in description_obj and description_obj['dom']:
+            dom_content = str(description_obj['dom']).strip()
+            logger.debug(f"Using DOM description (length: {len(dom_content)})")
+            return dom_content
+
+        logger.debug("No usable description format found")
+        return None
 
 
 def get_genius_client() -> Optional[RateLimitedGeniusClient]:

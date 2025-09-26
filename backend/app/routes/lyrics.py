@@ -57,7 +57,8 @@ def get_current_lyrics():
                 }
             }), 404
 
-        # Get lyrics and annotations
+        # Get detailed song information, lyrics and annotations
+        song_details = genius_client.get_song_details(genius_match['id'])
         lyrics = genius_client.get_lyrics_with_lyricsgenius(artists[0], track['name'])
         annotations = genius_client.get_song_annotations(genius_match['id'])
 
@@ -73,6 +74,7 @@ def get_current_lyrics():
                 'is_playing': current_track.get('is_playing', False)
             },
             'genius_match': genius_match,
+            'song_details': song_details,
             'lyrics': lyrics if lyrics else "Lyrics not available",
             'annotations': annotations,
             'annotation_count': len(annotations)
@@ -118,7 +120,8 @@ def search_and_get_lyrics():
                 'error': 'No matching song found on Genius'
             }), 404
 
-        # Get lyrics and annotations
+        # Get detailed song information, lyrics and annotations
+        song_details = genius_client.get_song_details(genius_match['id'])
         lyrics = genius_client.get_lyrics_with_lyricsgenius(artist, title)
         annotations = genius_client.get_song_annotations(genius_match['id'])
 
@@ -129,6 +132,7 @@ def search_and_get_lyrics():
                 'title': title
             },
             'genius_match': genius_match,
+            'song_details': song_details,
             'lyrics': lyrics if lyrics else "Lyrics not available",
             'annotations': annotations,
             'annotation_count': len(annotations)
