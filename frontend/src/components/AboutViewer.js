@@ -25,6 +25,24 @@ const AboutViewer = ({ songDetails, geniusMatch }) => {
   const renderDescription = (description) => {
     if (!description) return null;
 
+    // Check for malformed JSON/DOM content (like what we see in the screenshot)
+    const isMalformedContent = description.includes("{'tag':") ||
+                              description.includes('"tag":') ||
+                              description.includes('children":') ||
+                              description.includes("'children':");
+
+    if (isMalformedContent) {
+      // If this looks like malformed DOM/JSON, show a fallback message
+      return (
+        <Box sx={{ p: 2, bgcolor: 'grey.100', borderRadius: 1, fontStyle: 'italic' }}>
+          <Typography variant="body2" color="text.secondary">
+            Song description is available on Genius but could not be formatted properly.
+            Please visit the Genius page for full details.
+          </Typography>
+        </Box>
+      );
+    }
+
     // Check if the description contains HTML tags
     const hasHTMLTags = /<[^>]*>/g.test(description);
 

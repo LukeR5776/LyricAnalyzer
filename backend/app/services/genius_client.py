@@ -477,7 +477,7 @@ class RateLimitedGeniusClient:
         return min(1.0, jaccard_score + partial_bonus)
 
     def _extract_description(self, description_obj: Dict[str, Any]) -> Optional[str]:
-        """Extract description with format priority: html > plain > dom"""
+        """Extract description with format priority: plain > html (avoid DOM)"""
         if not description_obj:
             logger.debug("No description object available")
             return None
@@ -486,27 +486,63 @@ class RateLimitedGeniusClient:
         available_formats = list(description_obj.keys())
         logger.debug(f"Available description formats: {available_formats}")
 
-        # Try HTML format first (richest content)
-        if 'html' in description_obj and description_obj['html']:
-            html_content = description_obj['html'].strip()
-            logger.debug(f"Using HTML description (length: {len(html_content)})")
-            logger.debug(f"HTML description preview: {html_content[:200]}...")
-            return html_content
-
-        # Fall back to plain text
+        # Try plain text first (most reliable format)
         if 'plain' in description_obj and description_obj['plain']:
             plain_content = description_obj['plain'].strip()
             logger.debug(f"Using plain description (length: {len(plain_content)})")
             logger.debug(f"Plain description preview: {plain_content[:200]}...")
             return plain_content
 
-        # Last resort: DOM format
+        # Fall back to HTML format (needs processing)
+        if 'html' in description_obj and description_obj['html']:
+            html_content = description_obj['html'].strip()
+            logger.debug(f"Using HTML description (length: {len(html_content)})")
+            logger.debug(f"HTML description preview: {html_content[:200]}...")
+            return html_content
+
+        # Try to extract text from DOM structure if available
         if 'dom' in description_obj and description_obj['dom']:
-            dom_content = str(description_obj['dom']).strip()
-            logger.debug(f"Using DOM description (length: {len(dom_content)})")
-            return dom_content
+            dom_content = self._extract_text_from_dom(description_obj['dom'])
+            if dom_content:
+                logger.debug(f"Using extracted DOM text (length: {len(dom_content)})")
+                return dom_content
 
         logger.debug("No usable description format found")
+        return None
+
+    def _extract_text_from_dom(self, dom_obj) -> Optional[str]:
+        """Extract plain text from DOM structure"""
+        if not dom_obj:
+            return None
+
+        try:
+            # If dom_obj is a list, process each element
+            if isinstance(dom_obj, list):
+                text_parts = []
+                for item in dom_obj:
+                    text = self._extract_text_from_dom(item)
+                    if text:
+                        text_parts.append(text)
+                return ' '.join(text_parts) if text_parts else None
+
+            # If dom_obj is a dict with children, extract from children
+            elif isinstance(dom_obj, dict):
+                if 'children' in dom_obj:
+                    return self._extract_text_from_dom(dom_obj['children'])
+                elif 'tag' in dom_obj and dom_obj['tag'] == 'p' and 'children' in dom_obj:
+                    # Handle paragraph tags specifically
+                    return self._extract_text_from_dom(dom_obj['children'])
+                else:
+                    # Return the object as string if it's simple text
+                    return str(dom_obj) if isinstance(dom_obj, str) else None
+
+            # If it's a string, return as is
+            elif isinstance(dom_obj, str):
+                return dom_obj.strip()
+
+        except Exception as e:
+            logger.warning(f"Error extracting text from DOM: {str(e)}")
+
         return None
 
 
