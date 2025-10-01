@@ -34,7 +34,7 @@ function AppContent() {
             sx={{
               fontFamily: '"Lilita One", cursive',
               fontWeight: 400,
-              fontSize: '1.75rem',
+              fontSize: '2rem',
               color: '#fff',
               letterSpacing: '0.02em',
               textAlign: 'center'

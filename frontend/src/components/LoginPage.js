@@ -44,7 +44,7 @@ const LoginPage = () => {
           <Box>
             <MusicNote sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
             <Typography variant="h4" gutterBottom>
-              Welcome to Lyrics Scraper
+              Welcome to LYRICA
             </Typography>
             <Typography variant="body1" color="text.secondary" paragraph>
               Discover the meaning behind your favorite songs with real-time

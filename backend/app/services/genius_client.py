@@ -207,20 +207,35 @@ class RateLimitedGeniusClient:
             data = response.json()
             referents = data.get("response", {}).get("referents", [])
 
+
             annotations = []
             for referent in referents:
+                # Extract range data if available
+                range_data = referent.get('range')
+                start_pos = referent.get('start') or (range_data.get('start') if range_data else None)
+                end_pos = referent.get('end') or (range_data.get('end') if range_data else None)
+
                 for annotation in referent.get("annotations", []):
-                    annotations.append({
+                    annotation_data = {
                         "id": annotation.get("id"),
                         "body": annotation.get("body", {}).get("html"),
                         "fragment": referent.get("fragment"),
-                        "range": referent.get("range"),
                         "url": annotation.get("url"),
                         "verified": annotation.get("verified"),
                         "cosigned_by": annotation.get("cosigned_by", []),
                         "votes_total": annotation.get("votes_total", 0),
                         "authors": annotation.get("authors", [])
-                    })
+                    }
+
+                    # Add range/position data if available
+                    if range_data:
+                        annotation_data["range"] = range_data
+                    if start_pos is not None:
+                        annotation_data["start_position"] = start_pos
+                    if end_pos is not None:
+                        annotation_data["end_position"] = end_pos
+
+                    annotations.append(annotation_data)
 
             return annotations
 
@@ -230,6 +245,7 @@ class RateLimitedGeniusClient:
         except Exception as e:
             logger.error(f"Unexpected error in get_song_annotations: {str(e)}")
             return []
+
 
     def get_lyrics_with_lyricsgenius(self, artist: str, title: str) -> Optional[str]:
         """Get lyrics using the lyricsgenius library (includes scraping)"""

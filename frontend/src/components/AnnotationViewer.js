@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -13,21 +13,31 @@ import {
   Avatar,
   Link,
   Stack,
-  Divider
+  Divider,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel
 } from '@mui/material';
 import {
   ExpandMore,
   OpenInNew,
   ThumbUp,
   Verified,
-  Person
+  Person,
+  Sort
 } from '@mui/icons-material';
 
 const AnnotationViewer = ({ annotations }) => {
   const [expanded, setExpanded] = useState(false);
+  const [sortBy, setSortBy] = useState('chronological');
 
   const handleAccordionChange = (panel) => (event, isExpanded) => {
     setExpanded(isExpanded ? panel : false);
+  };
+
+  const handleSortChange = (event) => {
+    setSortBy(event.target.value);
   };
 
   const openAnnotationUrl = (url) => {
@@ -40,6 +50,36 @@ const AnnotationViewer = ({ annotations }) => {
     if (!html) return '';
     return html.replace(/<[^>]*>/g, '').trim();
   };
+
+  // Sort annotations based on selected method
+  const sortedAnnotations = useMemo(() => {
+    if (!annotations || annotations.length === 0) return [];
+
+    const annotationsCopy = [...annotations];
+
+    if (sortBy === 'chronological') {
+      // Sort by line number in song lyrics
+      return annotationsCopy.sort((a, b) => {
+        // Use lyrics_line_number if available, otherwise put at end
+        const aLineNumber = a.lyrics_line_number !== undefined && a.lyrics_line_number !== -1
+          ? a.lyrics_line_number
+          : 999999;
+        const bLineNumber = b.lyrics_line_number !== undefined && b.lyrics_line_number !== -1
+          ? b.lyrics_line_number
+          : 999999;
+        return aLineNumber - bLineNumber;
+      });
+    } else if (sortBy === 'upvotes') {
+      // Sort by votes_total (descending - most upvoted first)
+      return annotationsCopy.sort((a, b) => {
+        const aVotes = a.votes_total || 0;
+        const bVotes = b.votes_total || 0;
+        return bVotes - aVotes;
+      });
+    }
+
+    return annotationsCopy;
+  }, [annotations, sortBy]);
 
   if (!annotations || annotations.length === 0) {
     return (
@@ -56,8 +96,28 @@ const AnnotationViewer = ({ annotations }) => {
 
   return (
     <Box sx={{ p: 2, height: '100%', overflow: 'auto' }}>
+      {/* Sort Controls */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Sort />
+          Annotations ({sortedAnnotations.length})
+        </Typography>
+
+        <FormControl size="small" sx={{ minWidth: 180 }}>
+          <InputLabel>Sort by</InputLabel>
+          <Select
+            value={sortBy}
+            label="Sort by"
+            onChange={handleSortChange}
+          >
+            <MenuItem value="chronological">Song Order</MenuItem>
+            <MenuItem value="upvotes">Most Upvoted</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
       <Stack spacing={2}>
-        {annotations.map((annotation, index) => (
+        {sortedAnnotations.map((annotation, index) => (
           <Accordion
             key={annotation.id || index}
             expanded={expanded === `panel${index}`}

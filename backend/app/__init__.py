@@ -29,10 +29,13 @@ def create_app():
 
     # Enable CORS with proper configuration for credentials and cross-origin requests
     CORS(app,
-         origins=['http://localhost:3000', 'http://127.0.0.1:3000'],
-         supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization'],
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+         resources={r"/*": {
+             "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+             "supports_credentials": True,
+             "allow_headers": ["Content-Type", "Authorization"],
+             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+             "expose_headers": ["Content-Type", "Authorization"]
+         }})
 
     # Rate limiting with higher limits for auth endpoints
     limiter = Limiter(

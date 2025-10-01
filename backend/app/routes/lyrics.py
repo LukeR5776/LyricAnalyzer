@@ -3,9 +3,67 @@ from ..services.genius_client import get_genius_client
 from .spotify import get_spotify_client
 import logging
 import time
+import re
 
 logger = logging.getLogger(__name__)
 lyrics_bp = Blueprint('lyrics', __name__)
+
+def _calculate_line_numbers(annotations, lyrics):
+    """Calculate which line number each annotation corresponds to in the lyrics"""
+    if not lyrics or not annotations:
+        return annotations
+
+    # Split lyrics into lines for line-by-line matching
+    lyrics_lines = [line.strip() for line in lyrics.split('\n') if line.strip()]
+    lyrics_lines_lower = [line.lower() for line in lyrics_lines]
+
+    logger.info(f"Calculating line numbers for {len(annotations)} annotations against {len(lyrics_lines)} lyric lines")
+
+    for annotation in annotations:
+        line_number = -1
+
+        # Get the annotation text to match (prefer range.content over fragment)
+        annotation_text = None
+        if 'range' in annotation and annotation['range'] and 'content' in annotation['range']:
+            annotation_text = annotation['range']['content'].strip()
+        elif annotation.get('fragment'):
+            annotation_text = annotation['fragment'].strip()
+
+        if not annotation_text:
+            annotation['lyrics_line_number'] = -1
+            annotation['line_match_method'] = 'no_text'
+            continue
+
+        # Normalize for matching
+        annotation_text_lower = annotation_text.lower().strip()
+
+        # Strategy 1: Find exact line match
+        for i, line in enumerate(lyrics_lines_lower):
+            if line == annotation_text_lower:
+                line_number = i + 1  # 1-based line numbers
+                break
+
+        # Strategy 2: Find line that contains the annotation text
+        if line_number == -1:
+            for i, line in enumerate(lyrics_lines_lower):
+                if annotation_text_lower in line and len(annotation_text_lower) > 5:
+                    line_number = i + 1
+                    break
+
+        # Strategy 3: Find line where annotation text contains the line (for longer annotations)
+        if line_number == -1:
+            for i, line in enumerate(lyrics_lines_lower):
+                if line in annotation_text_lower and len(line) > 5:
+                    line_number = i + 1
+                    break
+
+        annotation['lyrics_line_number'] = line_number
+        annotation['line_match_method'] = 'matched' if line_number != -1 else 'failed'
+
+        if line_number != -1:
+            logger.debug(f"Matched annotation to line {line_number}: '{annotation_text[:50]}...'")
+
+    return annotations
 
 @lyrics_bp.route('/current')
 def get_current_lyrics():
@@ -59,8 +117,14 @@ def get_current_lyrics():
 
         # Get detailed song information, lyrics and annotations
         song_details = genius_client.get_song_details(genius_match['id'])
+
+        # Get lyrics using LyricsGenius scraping
         lyrics = genius_client.get_lyrics_with_lyricsgenius(artists[0], track['name'])
         annotations = genius_client.get_song_annotations(genius_match['id'])
+
+        # Calculate line numbers for annotations
+        if lyrics and annotations:
+            annotations = _calculate_line_numbers(annotations, lyrics)
 
         return jsonify({
             'success': True,
@@ -122,8 +186,14 @@ def search_and_get_lyrics():
 
         # Get detailed song information, lyrics and annotations
         song_details = genius_client.get_song_details(genius_match['id'])
+
+        # Get lyrics using LyricsGenius scraping
         lyrics = genius_client.get_lyrics_with_lyricsgenius(artist, title)
         annotations = genius_client.get_song_annotations(genius_match['id'])
+
+        # Calculate line numbers for annotations
+        if lyrics and annotations:
+            annotations = _calculate_line_numbers(annotations, lyrics)
 
         return jsonify({
             'success': True,
@@ -164,7 +234,7 @@ def get_lyrics_by_genius_id(genius_song_id):
                 'error': 'Song not found'
             }), 404
 
-        # Get lyrics
+        # Get lyrics using LyricsGenius scraping
         lyrics = genius_client.get_lyrics_with_lyricsgenius(
             song_details['artist'],
             song_details['title']
@@ -172,6 +242,10 @@ def get_lyrics_by_genius_id(genius_song_id):
 
         # Get annotations
         annotations = genius_client.get_song_annotations(genius_song_id)
+
+        # Calculate line numbers for annotations
+        if lyrics and annotations:
+            annotations = _calculate_line_numbers(annotations, lyrics)
 
         return jsonify({
             'success': True,

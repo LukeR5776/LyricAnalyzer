@@ -198,7 +198,7 @@ const SettingsPage = () => {
         {/* About */}
         <Paper sx={{ p: 3 }}>
           <Typography variant="h6" gutterBottom>
-            About Lyrics Scraper
+            About LYRICA
           </Typography>
 
           <Typography variant="body2" paragraph>

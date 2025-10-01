@@ -17,7 +17,7 @@ def main():
     port = int(os.getenv('PORT', 5000))
     debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
 
-    print(f"Starting Lyrics Scraper API server...")
+    print(f"Starting Lyrica API server...")
     print(f"Server running at: http://{host}:{port}")
     print(f"Debug mode: {debug}")
     print("\nAvailable endpoints:")

@@ -34,7 +34,7 @@
   },
   "build": {
     "appId": "com.lyricsscraper.app",
-    "productName": "Lyrics Scraper",
+    "productName": "Lyrica",
     "directories": {
       "output": "dist"
     },
