@@ -18,8 +18,20 @@ export const AuthProvider = ({ children }) => {
 
   // Check authentication status on mount
   useEffect(() => {
-    checkAuthStatus();
+    initializeAndCheckAuth();
   }, []);
+
+  const initializeAndCheckAuth = async () => {
+    try {
+      // Initialize API service first to detect backend port
+      await apiService.initialize();
+      // Then check auth status
+      await checkAuthStatus();
+    } catch (error) {
+      console.error('Error initializing API service:', error);
+      setLoading(false);
+    }
+  };
 
   const checkAuthStatus = async () => {
     try {

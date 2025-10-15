@@ -39,14 +39,14 @@ const MainDashboard = () => {
     fetchCurrentTrack();
   }, []);
 
-  const fetchCurrentTrack = async () => {
+  const fetchCurrentTrack = async (forceRefresh = false) => {
     // Prevent duplicate simultaneous requests
     if (fetchingTrack) return;
 
     try {
       setFetchingTrack(true);
       setError(null);
-      const response = await apiService.getCurrentTrack();
+      const response = await apiService.getCurrentTrack(forceRefresh);
 
       if (response.success && response.playing) {
         setCurrentTrack(response.track);
@@ -104,7 +104,7 @@ const MainDashboard = () => {
   };
 
   const handleRefresh = () => {
-    fetchCurrentTrack();
+    fetchCurrentTrack(true); // Force refresh bypasses cache
     if (currentTrack) {
       fetchCurrentLyrics();
     }
@@ -170,7 +170,7 @@ const MainDashboard = () => {
           </Typography>
           <Button
             variant="contained"
-            onClick={fetchCurrentTrack}
+            onClick={() => fetchCurrentTrack(true)}
             startIcon={<RefreshIcon />}
           >
             Check for Music

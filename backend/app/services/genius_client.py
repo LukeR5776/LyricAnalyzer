@@ -1,8 +1,10 @@
 import requests
 import time
 import lyricsgenius
+import re
 from typing import Dict, List, Optional, Any
 from flask import current_app
+from bs4 import BeautifulSoup
 import logging
 
 logger = logging.getLogger(__name__)
@@ -247,71 +249,186 @@ class RateLimitedGeniusClient:
             return []
 
 
-    def get_lyrics_with_lyricsgenius(self, artist: str, title: str) -> Optional[str]:
-        """Get lyrics using the lyricsgenius library (includes scraping)"""
+    def get_lyrics_with_lyricsgenius(self, artist: str, title: str, song_url: Optional[str] = None) -> Optional[str]:
+        """Get lyrics by scraping Genius page
+
+        Args:
+            artist: Artist name
+            title: Song title
+            song_url: Genius song URL. If provided, scrapes directly from this URL (RECOMMENDED)
+
+        Returns:
+            Lyrics string or None if not found
+        """
         self._wait_if_needed()
 
         try:
-            # Clean up the search query
+            lyrics = None
+
+            # PREFERRED: Use direct URL scraping if URL is provided
+            if song_url:
+                logger.info(f"Scraping lyrics from Genius URL: {song_url}")
+                lyrics = self._scrape_lyrics_from_url(song_url)
+
+                if lyrics:
+                    logger.info(f"Successfully scraped lyrics from URL ({len(lyrics)} chars)")
+                    return lyrics
+                else:
+                    logger.warning(f"Failed to scrape lyrics from URL: {song_url}")
+
+            # FALLBACK: Try lyricsgenius library search (less reliable)
+            logger.info(f"Falling back to lyricsgenius search for: '{artist}' - '{title}'")
             clean_title = self._clean_song_title(title)
             clean_artist = self._clean_artist_name(artist)
 
-            logger.info(f"Searching lyrics for: {clean_artist} - {clean_title}")
-
-            # Try to get the song with multiple approaches
             song = None
-
-            # First attempt: search by title and artist
             try:
                 song = self.genius.search_song(clean_title, clean_artist)
-                logger.debug(f"First search attempt result: {song.title if song else 'No song found'}")
-            except Exception as search_error:
-                logger.warning(f"First search attempt failed: {str(search_error)}")
+            except Exception as e:
+                logger.warning(f"lyricsgenius search failed: {e}")
 
-            # Second attempt: search by title only if first failed
-            if not song:
-                try:
-                    logger.debug("Trying search by title only")
-                    song = self.genius.search_song(clean_title)
-                    logger.debug(f"Title-only search result: {song.title if song else 'No song found'}")
-                except Exception as search_error:
-                    logger.warning(f"Title-only search failed: {str(search_error)}")
+            if song and hasattr(song, 'lyrics') and song.lyrics:
+                lyrics = song.lyrics.strip()
+                lyrics = self._clean_scraped_lyrics(lyrics)
 
-            if song and song.lyrics:
-                # Check if we got actual lyrics or a placeholder
-                lyrics_content = song.lyrics.strip()
-                logger.debug(f"Retrieved lyrics length: {len(lyrics_content)} characters")
-                logger.debug(f"Lyrics preview: {lyrics_content[:200]}...")
+                if len(lyrics) > 50:
+                    logger.info(f"Retrieved lyrics via search ({len(lyrics)} chars)")
+                    return lyrics
 
-                # Check for common placeholder patterns
-                placeholder_patterns = [
-                    "visit genius.com",
-                    "go to genius.com",
-                    "view lyrics on genius",
-                    "lyrics not available",
-                    "instrumental"
-                ]
-
-                lyrics_lower = lyrics_content.lower()
-                is_placeholder = any(pattern in lyrics_lower for pattern in placeholder_patterns)
-
-                if is_placeholder:
-                    logger.warning(f"Detected placeholder lyrics: {lyrics_content[:100]}")
-                    return None
-
-                if len(lyrics_content) > 50:  # Reasonable minimum for actual lyrics
-                    logger.info(f"Successfully retrieved lyrics ({len(lyrics_content)} chars)")
-                    return lyrics_content
-                else:
-                    logger.warning(f"Lyrics too short, likely placeholder: {lyrics_content}")
-                    return None
-
-            logger.warning(f"No lyrics found for: {clean_artist} - {clean_title}")
+            logger.warning(f"No lyrics found for '{title}' by '{artist}'")
             return None
 
         except Exception as e:
-            logger.error(f"Error getting lyrics with lyricsgenius: {str(e)}")
+            logger.error(f"Error getting lyrics: {str(e)}", exc_info=True)
             return None
+
+    def _scrape_lyrics_from_url(self, url: str) -> Optional[str]:
+        """Scrape lyrics directly from a Genius song URL using BeautifulSoup
+
+        This is more reliable than lyricsgenius library because we're getting
+        the exact song page, not searching.
+        """
+        try:
+            # Use session with appropriate headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                'Accept': 'text/html,application/xhtml+xml',
+                'Accept-Language': 'en-US,en;q=0.9',
+            }
+
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.content, 'html.parser')
+
+            # Genius uses data-lyrics-container attribute for lyrics divs
+            lyrics_divs = soup.find_all('div', {'data-lyrics-container': 'true'})
+
+            if not lyrics_divs:
+                logger.warning(f"No lyrics containers found on page: {url}")
+                return None
+
+            # Extract text from all lyrics containers
+            lyrics_parts = []
+            for div in lyrics_divs:
+                # Get text but preserve line breaks
+                text = div.get_text(separator='\n', strip=True)
+                if text:
+                    lyrics_parts.append(text)
+
+            if not lyrics_parts:
+                return None
+
+            lyrics = '\n\n'.join(lyrics_parts)
+
+            # Clean the scraped lyrics
+            lyrics = self._clean_scraped_lyrics(lyrics)
+
+            return lyrics if lyrics else None
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP error scraping {url}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error parsing lyrics from {url}: {e}")
+            return None
+
+    def _clean_scraped_lyrics(self, lyrics: str) -> str:
+        """Clean scraped lyrics to remove Genius metadata and extra content"""
+        if not lyrics:
+            return lyrics
+
+        # Split into lines for processing
+        lines = lyrics.split('\n')
+        cleaned_lines = []
+
+        # Patterns to skip (case insensitive)
+        skip_patterns = [
+            r'^\d+\s*contributors?',  # "184 Contributors"
+            r'^translations?',  # "Translations"
+            r'^(polish|русский|français|türkçe|español|português|italiano|deutsch)',  # Language names
+            r'^\(russian\)',  # Language names in parentheses
+            r'^less i know the better lyrics',  # Song title headers
+            r'^".*" describes',  # Description text like '"The Less I Know the Better" describes'
+            r'^\.\.\.\s*read more',  # "... Read More"
+            r'^read more$',  # "Read More"
+            r'^embed$',  # "Embed"
+            r'^you might also like$',  # "You might also like"
+        ]
+
+        # Track if we've found the start of actual lyrics
+        lyrics_started = False
+        description_section = False
+
+        for line in lines:
+            line_stripped = line.strip()
+            line_lower = line_stripped.lower()
+
+            # Skip empty lines before lyrics start
+            if not lyrics_started and not line_stripped:
+                continue
+
+            # Check if this line should be skipped
+            should_skip = False
+            for pattern in skip_patterns:
+                if re.match(pattern, line_lower):
+                    should_skip = True
+                    break
+
+            if should_skip:
+                continue
+
+            # Detect and skip description sections
+            if '"' in line_stripped and 'describes' in line_lower:
+                description_section = True
+                continue
+
+            # Skip lines that are part of description section
+            if description_section:
+                # End description section when we hit "Read More" or a bracket (song section)
+                if 'read more' in line_lower or line_stripped.startswith('['):
+                    description_section = False
+                    if line_stripped.startswith('['):
+                        # This is a song section, include it
+                        lyrics_started = True
+                        cleaned_lines.append(line)
+                continue
+
+            # If we see a bracket section header, lyrics have started
+            if line_stripped.startswith('[') and line_stripped.endswith(']'):
+                lyrics_started = True
+                cleaned_lines.append(line)
+                continue
+
+            # Once lyrics have started, keep all lines
+            if lyrics_started:
+                cleaned_lines.append(line)
+            # If line has substantial content and isn't metadata, assume lyrics started
+            elif len(line_stripped) > 0 and not any(c.isdigit() for c in line_stripped[:10]):
+                lyrics_started = True
+                cleaned_lines.append(line)
+
+        return '\n'.join(cleaned_lines).strip()
 
     def _clean_song_title(self, title: str) -> str:
         """Clean song title for better matching"""

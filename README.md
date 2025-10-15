@@ -18,21 +18,31 @@ An application that integrates with Spotify and Genius.com to allow users to qui
 - **Authentication**: OAuth 2.0 with claim-based session handling
 - **Data**: Session-based storage with rate-limited API calls
 
-## Setup
+## Quick Start
 
-### Backend
+### Easy Start (Recommended)
+```bash
+./start.sh
+```
+This will automatically start both backend and frontend with proper port configuration.
+
+### Manual Setup
+
+#### Backend
 ```bash
 cd backend
 pip install -r requirements.txt
-python main.py
+PORT=5001 python3 main.py
 ```
 
-### Frontend
+#### Frontend
 ```bash
 cd frontend
 npm install
-npm run electron-dev
+npm start
 ```
+
+> **Note**: The backend and frontend now automatically detect and sync ports at runtime, so you don't need to manually configure ports anymore!
 
 ## API Keys Required
 

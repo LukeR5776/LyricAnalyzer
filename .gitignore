@@ -54,6 +54,7 @@ pids/
 *.pid
 *.seed
 *.pid.lock
+port-config.json
 
 # Coverage directory used by tools like istanbul
 coverage/

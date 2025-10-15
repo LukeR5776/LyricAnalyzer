@@ -8,6 +8,27 @@ import re
 logger = logging.getLogger(__name__)
 lyrics_bp = Blueprint('lyrics', __name__)
 
+def _extract_lyrics_from_annotations(annotations):
+    """Extract lyrics from annotation fragments as a fallback when full lyrics aren't available"""
+    if not annotations:
+        return None
+
+    # Collect all unique fragments
+    fragments = []
+    seen = set()
+
+    for annotation in annotations:
+        fragment = annotation.get('fragment', '').strip()
+        if fragment and fragment not in seen:
+            fragments.append(fragment)
+            seen.add(fragment)
+
+    if not fragments:
+        return None
+
+    # Join fragments with newlines
+    return '\n'.join(fragments)
+
 def _calculate_line_numbers(annotations, lyrics):
     """Calculate which line number each annotation corresponds to in the lyrics"""
     if not lyrics or not annotations:
@@ -118,9 +139,20 @@ def get_current_lyrics():
         # Get detailed song information, lyrics and annotations
         song_details = genius_client.get_song_details(genius_match['id'])
 
-        # Get lyrics using LyricsGenius scraping
-        lyrics = genius_client.get_lyrics_with_lyricsgenius(artists[0], track['name'])
+        # Get lyrics using LyricsGenius scraping - pass the matched song URL for reliability
+        lyrics = genius_client.get_lyrics_with_lyricsgenius(
+            artists[0],
+            track['name'],
+            song_url=genius_match.get('url')
+        )
         annotations = genius_client.get_song_annotations(genius_match['id'])
+
+        # Fallback: if lyrics failed but we have annotations, extract from fragments
+        if not lyrics and annotations:
+            logger.info("Full lyrics not available, extracting from annotation fragments")
+            lyrics = _extract_lyrics_from_annotations(annotations)
+            if lyrics:
+                logger.info(f"Extracted {len(lyrics)} characters from {len(annotations)} annotations")
 
         # Calculate line numbers for annotations
         if lyrics and annotations:
@@ -187,9 +219,20 @@ def search_and_get_lyrics():
         # Get detailed song information, lyrics and annotations
         song_details = genius_client.get_song_details(genius_match['id'])
 
-        # Get lyrics using LyricsGenius scraping
-        lyrics = genius_client.get_lyrics_with_lyricsgenius(artist, title)
+        # Get lyrics using LyricsGenius scraping - pass the matched song URL for reliability
+        lyrics = genius_client.get_lyrics_with_lyricsgenius(
+            artist,
+            title,
+            song_url=genius_match.get('url')
+        )
         annotations = genius_client.get_song_annotations(genius_match['id'])
+
+        # Fallback: if lyrics failed but we have annotations, extract from fragments
+        if not lyrics and annotations:
+            logger.info("Full lyrics not available, extracting from annotation fragments")
+            lyrics = _extract_lyrics_from_annotations(annotations)
+            if lyrics:
+                logger.info(f"Extracted {len(lyrics)} characters from {len(annotations)} annotations")
 
         # Calculate line numbers for annotations
         if lyrics and annotations:
@@ -234,14 +277,22 @@ def get_lyrics_by_genius_id(genius_song_id):
                 'error': 'Song not found'
             }), 404
 
-        # Get lyrics using LyricsGenius scraping
+        # Get lyrics using LyricsGenius scraping - pass the song URL for reliability
         lyrics = genius_client.get_lyrics_with_lyricsgenius(
             song_details['artist'],
-            song_details['title']
+            song_details['title'],
+            song_url=song_details.get('url')
         )
 
         # Get annotations
         annotations = genius_client.get_song_annotations(genius_song_id)
+
+        # Fallback: if lyrics failed but we have annotations, extract from fragments
+        if not lyrics and annotations:
+            logger.info("Full lyrics not available, extracting from annotation fragments")
+            lyrics = _extract_lyrics_from_annotations(annotations)
+            if lyrics:
+                logger.info(f"Extracted {len(lyrics)} characters from {len(annotations)} annotations")
 
         # Calculate line numbers for annotations
         if lyrics and annotations:

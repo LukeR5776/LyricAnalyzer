@@ -70,11 +70,15 @@ def get_current_track():
         # Get user ID for caching
         user_id = get_user_id_from_session()
 
-        # Check cache first
-        should_skip, cached_data = spotify_cache.should_skip_request(user_id, 'current-track')
-        if should_skip and cached_data:
-            logger.debug("Returning cached current track data")
-            return jsonify(cached_data)
+        # Check if force refresh is requested (bypasses cache)
+        force_refresh = request.args.get('force_refresh', 'false').lower() == 'true'
+
+        # Check cache first (unless force refresh)
+        if not force_refresh:
+            should_skip, cached_data = spotify_cache.should_skip_request(user_id, 'current-track')
+            if should_skip and cached_data:
+                logger.debug("Returning cached current track data")
+                return jsonify(cached_data)
 
         sp = get_spotify_client()
         if not sp:

@@ -10,9 +10,9 @@ class SpotifyCacheService:
 
     def __init__(self):
         self.cache = {}
-        self.cache_duration = 45  # Cache for 45 seconds
+        self.cache_duration = 10  # Cache for 10 seconds
         self.last_request_time = {}
-        self.min_request_interval = 5  # Minimum 5 seconds between requests
+        self.min_request_interval = 2  # Minimum 2 seconds between requests
 
     def _get_cache_key(self, user_id: str, endpoint: str) -> str:
         """Generate cache key for user and endpoint"""

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Paper,
   Box,
@@ -8,11 +8,15 @@ import {
   Switch,
   FormControlLabel,
   Chip,
-  Stack
+  Stack,
+  Divider
 } from '@mui/material';
 import { PlayArrow, Pause, Album } from '@mui/icons-material';
+import RatingStars from './RatingStars';
+import apiService from '../services/apiService';
 
 const CurrentTrackCard = ({ track, onRefresh, autoRefresh, onAutoRefreshChange }) => {
+  const [currentRating, setCurrentRating] = useState(0);
   const formatDuration = (ms) => {
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
@@ -22,6 +26,45 @@ const CurrentTrackCard = ({ track, onRefresh, autoRefresh, onAutoRefreshChange }
   const progressPercent = track.duration_ms > 0
     ? (track.progress_ms / track.duration_ms) * 100
     : 0;
+
+  // Load existing rating when track changes
+  useEffect(() => {
+    const loadRating = async () => {
+      if (!track?.id) return;
+
+      try {
+        const response = await apiService.getSongRating(track.id);
+        if (response.success && response.rating) {
+          setCurrentRating(response.rating.rating);
+        } else {
+          setCurrentRating(0);
+        }
+      } catch (error) {
+        // No rating exists, that's okay
+        setCurrentRating(0);
+      }
+    };
+
+    loadRating();
+  }, [track?.id]);
+
+  const handleRating = async (rating) => {
+    try {
+      const songData = {
+        spotify_id: track.id,
+        genius_id: track.genius_id,
+        title: track.name,
+        artist: track.artists.join(', '),
+        album: track.album?.name || track.album,
+        image_url: track.album?.images?.[0]?.url
+      };
+
+      await apiService.rateSong(songData, rating);
+      setCurrentRating(rating);
+    } catch (error) {
+      console.error('Error saving rating:', error);
+    }
+  };
 
   return (
     <Paper sx={{ p: 3 }}>
@@ -104,6 +147,20 @@ const CurrentTrackCard = ({ track, onRefresh, autoRefresh, onAutoRefreshChange }
               />
             )}
           </Stack>
+        </Box>
+
+        <Divider />
+
+        {/* Rating */}
+        <Box>
+          <Typography variant="body2" color="text.secondary" gutterBottom>
+            Rate this song
+          </Typography>
+          <RatingStars
+            rating={currentRating}
+            onRate={handleRating}
+            size="medium"
+          />
         </Box>
 
         {/* Auto-refresh Control */}

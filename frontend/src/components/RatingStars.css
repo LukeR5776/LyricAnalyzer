@@ -1,0 +1,83 @@
+.rating-stars {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stars-container {
+  display: flex;
+  gap: 4px;
+}
+
+.star-container {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+.star-container.readonly {
+  cursor: default;
+}
+
+.star-container.small {
+  width: 20px;
+  height: 20px;
+}
+
+.star-container.medium {
+  width: 28px;
+  height: 28px;
+}
+
+.star-container.large {
+  width: 36px;
+  height: 36px;
+}
+
+.star-half {
+  position: absolute;
+  top: 0;
+  width: 50%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.star-left {
+  left: 0;
+}
+
+.star-right {
+  right: 0;
+}
+
+.star-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.star-container.interactive:hover .star-svg path {
+  filter: brightness(1.1);
+}
+
+.rating-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  min-width: 60px;
+}
+
+.rating-stars.readonly .rating-value {
+  color: #666;
+}
+
+/* Animation on hover */
+.star-container.interactive {
+  transition: transform 0.1s ease;
+}
+
+.star-container.interactive:hover {
+  transform: scale(1.15);
+}

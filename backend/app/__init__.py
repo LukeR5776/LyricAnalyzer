@@ -28,9 +28,21 @@ def create_app():
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=30)
 
     # Enable CORS with proper configuration for credentials and cross-origin requests
+    # Support common frontend ports (3000-3003) and backend ports (5000-5003) to handle port conflicts
+    allowed_origins = [
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:3001", "http://127.0.0.1:3001",
+        "http://localhost:3002", "http://127.0.0.1:3002",
+        "http://localhost:3003", "http://127.0.0.1:3003",
+        "http://localhost:5000", "http://127.0.0.1:5000",
+        "http://localhost:5001", "http://127.0.0.1:5001",
+        "http://localhost:5002", "http://127.0.0.1:5002",
+        "http://localhost:5003", "http://127.0.0.1:5003"
+    ]
+
     CORS(app,
          resources={r"/*": {
-             "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+             "origins": allowed_origins,
              "supports_credentials": True,
              "allow_headers": ["Content-Type", "Authorization"],
              "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -45,17 +57,23 @@ def create_app():
     )
 
     # Register blueprints
+    from .routes.health import health_bp
     from .routes.auth import auth_bp
     from .routes.spotify import spotify_bp
     from .routes.genius import genius_bp
     from .routes.lyrics import lyrics_bp
+    from .routes.ratings import ratings_bp
 
     # Make limiter available to blueprints
     app.limiter = limiter
+
+    # Health check endpoint (no prefix, no rate limit)
+    app.register_blueprint(health_bp)
 
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(spotify_bp, url_prefix='/spotify')
     app.register_blueprint(genius_bp, url_prefix='/genius')
     app.register_blueprint(lyrics_bp, url_prefix='/lyrics')
+    app.register_blueprint(ratings_bp, url_prefix='/ratings')
 
     return app
